@@ -149,6 +149,7 @@ def score_candidate_confidence(
         "musicbrainz": 0.44,
         "acoustid": 0.50,
         "itunes": 0.34,
+        "deezer": 0.33,
         "lastfm": 0.28,
         "discogs": 0.22,
     }

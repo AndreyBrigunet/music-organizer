@@ -10,7 +10,7 @@ def test_build_config_reads_provider_order_from_env(monkeypatch, tmp_path: Path)
     output_dir = tmp_path / "output"
     input_dir.mkdir()
     output_dir.mkdir()
-    monkeypatch.setenv("SEARCH_PROVIDER_ORDER", "discogs,musicbrainz,itunes")
+    monkeypatch.setenv("SEARCH_PROVIDER_ORDER", "discogs,deezer,musicbrainz,itunes")
 
     config = build_config(
         input_dir=input_dir,
@@ -22,7 +22,7 @@ def test_build_config_reads_provider_order_from_env(monkeypatch, tmp_path: Path)
         export_unmatched_playlist=False,
     )
 
-    assert config.provider_order == ("discogs", "musicbrainz", "itunes")
+    assert config.provider_order == ("discogs", "deezer", "musicbrainz", "itunes")
 
 
 def test_build_config_rejects_invalid_provider_order(monkeypatch, tmp_path: Path) -> None:

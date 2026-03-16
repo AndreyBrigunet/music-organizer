@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 APP_NAME = "music-organizer"
 APP_VERSION = "1.0.0"
 SUPPORTED_EXTENSIONS: Set[str] = {".mp3", ".flac", ".m4a", ".opus", ".ogg", ".wav"}
-DEFAULT_PROVIDER_ORDER: Tuple[str, ...] = ("musicbrainz", "itunes", "lastfm", "discogs")
+DEFAULT_PROVIDER_ORDER: Tuple[str, ...] = ("musicbrainz", "itunes", "deezer", "lastfm", "discogs")
 SUPPORTED_SEARCH_PROVIDERS: Set[str] = set(DEFAULT_PROVIDER_ORDER)
 DEFAULT_MATCHED_PATH_TEMPLATE = "{artist}/{album}/{track_number} - {title}.{ext}"
 SUPPORTED_MATCHED_TEMPLATE_FIELDS: Set[str] = {"artist", "album", "track_number", "title", "ext"}

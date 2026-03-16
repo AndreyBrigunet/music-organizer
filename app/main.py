@@ -13,6 +13,7 @@ from rich.table import Table
 
 from app.acoustid_client import AcoustIdClient
 from app.config import APP_VERSION, SUPPORTED_EXTENSIONS, build_config
+from app.deezer_client import DeezerClient
 from app.discogs_client import DiscogsClient
 from app.itunes_client import ItunesClient
 from app.lastfm_client import LastFmClient
@@ -79,6 +80,7 @@ def main(
     scanner = LibraryScanner(SUPPORTED_EXTENSIONS)
     musicbrainz_client = MusicBrainzClient(logger=logger)
     itunes_client = ItunesClient(logger=logger)
+    deezer_client = DeezerClient(logger=logger)
     lastfm_client = LastFmClient(api_key=config.lastfm_api_key, logger=logger)
     discogs_client = DiscogsClient(user_token=config.discogs_user_token, logger=logger)
     acoustid_client = AcoustIdClient(
@@ -89,6 +91,7 @@ def main(
     search_clients_by_name = {
         "musicbrainz": musicbrainz_client,
         "itunes": itunes_client,
+        "deezer": deezer_client,
         "lastfm": lastfm_client,
         "discogs": discogs_client,
     }
@@ -104,13 +107,14 @@ def main(
 
     audio_files = list(scanner.scan(config.input_dir))
     console.print(
-        "[bold]Music Organizer[/bold] v{0}\nMode: {1}\nFiles discovered: {2}\nProvider order: {3}\nProviders: MusicBrainz={4}, iTunes={5}, Last.fm={6}, Discogs={7}, AcoustID={8} (fallback)".format(
+        "[bold]Music Organizer[/bold] v{0}\nMode: {1}\nFiles discovered: {2}\nProvider order: {3}\nProviders: MusicBrainz={4}, iTunes={5}, Deezer={6}, Last.fm={7}, Discogs={8}, AcoustID={9} (fallback)".format(
             APP_VERSION,
             config.mode.value,
             len(audio_files),
             " -> ".join(config.provider_order),
             musicbrainz_client.status_label,
             itunes_client.status_label,
+            deezer_client.status_label,
             lastfm_client.status_label,
             discogs_client.status_label,
             acoustid_client.status_label,

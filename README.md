@@ -22,6 +22,7 @@ Aplicația scanează recursiv fișierele audio suportate, citește tagurile exis
   - apoi încearcă inferența din numele fișierului
   - apoi caută în MusicBrainz
   - folosește iTunes Search API ca sursă suplimentară de catalog
+  - folosește Deezer Search API ca sursă suplimentară de catalog
   - folosește căutarea Last.fm atunci când `LASTFM_API_KEY` este configurată
   - folosește Discogs Database Search atunci când `DISCOGS_USER_TOKEN` este configurată
   - folosește AcoustID ca fallback pe bază de fingerprint audio atunci când `ACOUSTID_API_KEY` este configurată și există `fpcalc` sau Chromaprint
@@ -79,6 +80,9 @@ python -m pip install -r requirements.txt
 - `LASTFM_API_KEY`
   - Opțională.
   - Activează `track.search` din Last.fm ca sursă suplimentară de metadate.
+- `Deezer`
+  - Nu necesită cheie API în implementarea actuală.
+  - Este disponibil direct ca provider de căutare prin Deezer Search API.
 - `DISCOGS_USER_TOKEN`
   - Opțională.
   - Activează căutarea prin Discogs Database Search ca sursă suplimentară de identificare.
@@ -91,8 +95,8 @@ DISCOGS_USER_TOKEN=tokenul_tau_discogs
 - `SEARCH_PROVIDER_ORDER`
   - Opțională.
   - Controlează ordinea providerilor de catalog.
-  - Valori suportate: `musicbrainz`, `itunes`, `lastfm`, `discogs`
-  - Exemplu: `SEARCH_PROVIDER_ORDER=musicbrainz,itunes,lastfm,discogs`
+  - Valori suportate: `musicbrainz`, `itunes`, `deezer`, `lastfm`, `discogs`
+  - Exemplu: `SEARCH_PROVIDER_ORDER=musicbrainz,itunes,deezer,lastfm,discogs`
   - Pentru fiecare piesă, căutarea pornește din nou cu primul provider din listă și se oprește imediat ce apare un match online suficient de puternic.
   - `AcoustID` nu este controlat de această variabilă; rămâne fallback separat, deoarece este mai lent și lucrează pe fingerprint audio.
 - `MATCHED_PATH_TEMPLATE`
@@ -196,7 +200,7 @@ Scorul de încredere este construit din:
 
 - potrivirile exacte bazate pe taguri existente obțin scor mare
 - potrivirile deduse doar din numele fișierului obțin scor mai mic
-- iTunes și Last.fm pot confirma rezultatele MusicBrainz și pot reduce numărul de piese din `Review`
+- iTunes, Deezer și Last.fm pot confirma rezultatele MusicBrainz și pot reduce numărul de piese din `Review`
 - Discogs poate confirma artistul și release-ul pentru single-uri, albume sau ediții care lipsesc din alte cataloage
 - potrivirile puternice prin AcoustID pot fi acceptate chiar și atunci când tagurile locale sunt slabe
 - dacă nu există o potrivire online sigură, dar tagurile locale sunt bune, piesa intră direct în `Matched`
