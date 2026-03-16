@@ -1,0 +1,1 @@
+"""Music organizer application package."""
