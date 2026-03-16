@@ -14,6 +14,10 @@ class AudioMetadata:
     disc_number: Optional[str] = None
     date: Optional[str] = None
     genre: Optional[str] = None
+    musicbrainz_recording_id: Optional[str] = None
+    musicbrainz_release_id: Optional[str] = None
+    musicbrainz_artist_id: Optional[str] = None
+    musicbrainz_album_artist_id: Optional[str] = None
     source: str = "unknown"
 
     def has_core_identity(self) -> bool:
@@ -45,6 +49,10 @@ class AudioMetadata:
             disc_number=self.disc_number or fallback.disc_number,
             date=self.date or fallback.date,
             genre=self.genre or fallback.genre,
+            musicbrainz_recording_id=self.musicbrainz_recording_id or fallback.musicbrainz_recording_id,
+            musicbrainz_release_id=self.musicbrainz_release_id or fallback.musicbrainz_release_id,
+            musicbrainz_artist_id=self.musicbrainz_artist_id or fallback.musicbrainz_artist_id,
+            musicbrainz_album_artist_id=self.musicbrainz_album_artist_id or fallback.musicbrainz_album_artist_id,
             source=source or self.source,
         )
 
@@ -64,6 +72,10 @@ class AudioMetadata:
             disc_number=self.disc_number or fallback.disc_number,
             date=self.date,
             genre=self.genre,
+            musicbrainz_recording_id=self.musicbrainz_recording_id,
+            musicbrainz_release_id=self.musicbrainz_release_id,
+            musicbrainz_artist_id=self.musicbrainz_artist_id,
+            musicbrainz_album_artist_id=self.musicbrainz_album_artist_id,
             source=source or self.source,
         )
 

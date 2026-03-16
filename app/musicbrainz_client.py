@@ -82,14 +82,20 @@ class MusicBrainzClient:
 
         recording = response.get("recording", {})
         artist_phrase = normalize_text(recording.get("artist-credit-phrase"))
+        artist_id = self._extract_primary_artist_id(recording.get("artist-credit", []))
         release_list = recording.get("release-list", [])
         release = release_list[0] if release_list else {}
+        release_artist_id = self._extract_primary_artist_id(release.get("artist-credit", [])) or artist_id
         metadata = AudioMetadata(
             title=normalize_text(recording.get("title")),
             artist=artist_phrase,
             album=normalize_text(release.get("title")),
             album_artist=artist_phrase,
             track_number=None,
+            musicbrainz_recording_id=normalize_text(recording.get("id")),
+            musicbrainz_release_id=normalize_text(release.get("id")),
+            musicbrainz_artist_id=artist_id,
+            musicbrainz_album_artist_id=release_artist_id,
             source="musicbrainz",
         )
         self._lookup_cache[recording_id] = deepcopy(metadata)
@@ -99,6 +105,8 @@ class MusicBrainzClient:
         release_list = item.get("release-list", [])
         first_release = release_list[0] if release_list else {}
         artist_phrase = normalize_text(item.get("artist-credit-phrase"))
+        artist_id = self._extract_primary_artist_id(item.get("artist-credit", []))
+        release_artist_id = self._extract_primary_artist_id(first_release.get("artist-credit", [])) or artist_id
         track_number = None
         medium_list = first_release.get("medium-list", [])
         if medium_list:
@@ -113,6 +121,10 @@ class MusicBrainzClient:
             album_artist=artist_phrase,
             track_number=track_number,
             date=normalize_text(first_release.get("date")),
+            musicbrainz_recording_id=normalize_text(item.get("id")),
+            musicbrainz_release_id=normalize_text(first_release.get("id")),
+            musicbrainz_artist_id=artist_id,
+            musicbrainz_album_artist_id=release_artist_id,
             source="musicbrainz",
         )
         raw_score = self._extract_score(item)
@@ -145,3 +157,17 @@ class MusicBrainzClient:
             normalize_for_compare(metadata.album),
             limit,
         )
+
+    @staticmethod
+    def _extract_primary_artist_id(artist_credit: object) -> Optional[str]:
+        if not isinstance(artist_credit, list):
+            return None
+        for item in artist_credit:
+            if not isinstance(item, dict):
+                continue
+            artist = item.get("artist")
+            if isinstance(artist, dict):
+                artist_id = normalize_text(artist.get("id"))
+                if artist_id:
+                    return artist_id
+        return None

@@ -10,6 +10,13 @@ def test_recording_to_candidate_uses_ext_score_and_track_number() -> None:
             "ext:score": "100",
             "title": "Noaptea pe la 3",
             "artist-credit-phrase": "Satoshi & Carla’s Dreams",
+            "artist-credit": [
+                {
+                    "artist": {
+                        "id": "artist-id-1",
+                    }
+                }
+            ],
             "release-list": [
                 {
                     "id": "release-id",
@@ -29,6 +36,9 @@ def test_recording_to_candidate_uses_ext_score_and_track_number() -> None:
 
     assert candidate.raw_score == 1.0
     assert candidate.metadata.track_number == "1"
+    assert candidate.metadata.musicbrainz_recording_id == "recording-id"
+    assert candidate.metadata.musicbrainz_release_id == "release-id"
+    assert candidate.metadata.musicbrainz_artist_id == "artist-id-1"
 
 
 def test_search_recordings_uses_cache_for_identical_queries(monkeypatch) -> None:
