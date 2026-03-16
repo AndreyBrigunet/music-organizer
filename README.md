@@ -136,7 +136,7 @@ Pentru a vedea în terminal decizia pentru fiecare fișier procesat:
 python -m app.main --input "D:\MusicRaw" --output "D:\MusicSorted" --dry-run --verbose
 ```
 
-Pentru potrivirile ambigue, aplicația întreabă implicit direct în terminal ce variantă este corectă:
+Pentru potrivirile ambigue, aplicația întreabă implicit direct în terminal ce variantă este corectă. Poți alege o variantă din listă sau `0` pentru `niciunul`, caz în care piesa rămâne în `Review`:
 
 ```powershell
 python -m app.main --input "D:\MusicRaw" --output "D:\MusicSorted" --dry-run

@@ -1,7 +1,7 @@
 import logging
 from pathlib import Path
 
-from app.main import maybe_resolve_review_decision
+from app.main import maybe_resolve_review_decision, prompt_for_review_candidate
 from app.models import AudioMetadata, CandidateMatch, MatchDecision
 
 
@@ -161,3 +161,20 @@ def test_interactive_review_does_not_recheck_terminal_support(monkeypatch) -> No
 
     assert resolved.action == "Matched"
     assert resolved.chosen_match is selected_candidate
+
+
+def test_prompt_for_review_candidate_accepts_zero_as_keep_in_review(monkeypatch) -> None:
+    candidate = CandidateMatch(
+        metadata=AudioMetadata(title="Song", artist="Artist", album="Album", source="discogs"),
+        confidence=0.72,
+        source="discogs",
+    )
+    monkeypatch.setattr("builtins.input", lambda _: "0")
+
+    selected = prompt_for_review_candidate(
+        audio_path=Path("song.flac"),
+        detected_metadata=AudioMetadata(title="Song", artist="Artist", source="filename"),
+        candidates=[candidate],
+    )
+
+    assert selected is None

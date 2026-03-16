@@ -344,6 +344,7 @@ def prompt_for_review_candidate(
     table.add_column("Artist")
     table.add_column("Title")
     table.add_column("Album")
+    table.add_row("0", "-", "-", "-", "None of these", "Review")
     for index, candidate in enumerate(candidates, start=1):
         table.add_row(
             str(index),
@@ -354,9 +355,11 @@ def prompt_for_review_candidate(
             candidate.metadata.album or "Singles",
         )
     console.print(table)
-    console.print("[bold cyan]Type the number of the correct variant and press Enter. Use s or empty input to keep it in Review.[/bold cyan]")
+    console.print(
+        "[bold cyan]Type the number of the correct variant and press Enter. Use 0, s, or empty input to keep it in Review.[/bold cyan]"
+    )
 
-    prompt_label = "Select a variant [1-{0}] or s to keep it in Review: ".format(len(candidates))
+    prompt_label = "Select a variant [1-{0}], or 0 to keep it in Review: ".format(len(candidates))
     while True:
         try:
             choice = input(prompt_label).strip().lower()
@@ -366,13 +369,13 @@ def prompt_for_review_candidate(
         except KeyboardInterrupt:
             console.print("\n[yellow]Interactive selection cancelled. This file will stay in Review.[/yellow]")
             return None
-        if not choice or choice == "s":
+        if not choice or choice in {"0", "s"}:
             return None
         if choice.isdigit():
             candidate_index = int(choice)
             if 1 <= candidate_index <= len(candidates):
                 return candidates[candidate_index - 1]
-        console.print("[red]Invalid selection. Choose a listed number or s.[/red]")
+        console.print("[red]Invalid selection. Choose 0, a listed number, or s.[/red]")
 
 
 def build_progress() -> Progress:
