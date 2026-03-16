@@ -45,7 +45,9 @@ def test_interactive_review_selection_converts_review_to_matched(monkeypatch) ->
         raw_metadata=AudioMetadata(
             title="Noaptea pe la 3",
             artist="Satoshi & Carla's Dreams",
-            genre="Pop",
+            album="PrimeMusic.ru December 2014",
+            genre="Prime Music",
+            track_number="1",
             source="tags",
         ),
         decision=decision,
@@ -56,7 +58,9 @@ def test_interactive_review_selection_converts_review_to_matched(monkeypatch) ->
     assert resolved.action == "Matched"
     assert resolved.chosen_match is selected_candidate
     assert resolved.metadata_to_write is not None
-    assert resolved.metadata_to_write.genre == "Pop"
+    assert resolved.metadata_to_write.track_number == "1"
+    assert resolved.metadata_to_write.album == "Noaptea pe la 3"
+    assert resolved.metadata_to_write.genre is None
     assert "user_selected_candidate" in resolved.notes
 
 

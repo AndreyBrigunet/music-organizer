@@ -156,3 +156,49 @@ def test_review_decision_keeps_candidate_list_for_interactive_selection() -> Non
     assert decision.action == "Review"
     assert len(decision.review_candidates) == 1
     assert decision.review_candidates[0].recording_id == "candidate-1"
+
+
+class _StrongLastFmStyleClient:
+    def search_recordings(self, metadata: AudioMetadata, limit: int = 5):
+        return [
+            CandidateMatch(
+                metadata=AudioMetadata(
+                    title="Bye Bye",
+                    artist="Belleamy",
+                    source="lastfm",
+                ),
+                confidence=0.0,
+                source="lastfm",
+                raw_score=0.99,
+                recording_id="candidate-strong-1",
+            )
+        ]
+
+
+def test_online_match_does_not_preserve_stale_album_or_genre_tags() -> None:
+    matcher = TrackMatcher(
+        min_confidence=0.85,
+        search_clients=[_StrongLastFmStyleClient()],
+        acoustid_client=_NoAcoustIdClient(),
+        search_limit=5,
+    )
+
+    decision = matcher.match(
+        Path("Belleamy - Bye Bye.mp3"),
+        AudioMetadata(
+            title="Bye Bye",
+            artist="Belleamy",
+            album="PrimeMusic.ru December 2014",
+            genre="Prime Music",
+            track_number="1",
+            source="tags",
+        ),
+    )
+
+    assert decision.action == "Matched"
+    assert decision.metadata_to_write is not None
+    assert decision.metadata_to_write.title == "Bye Bye"
+    assert decision.metadata_to_write.artist == "Belleamy"
+    assert decision.metadata_to_write.album is None
+    assert decision.metadata_to_write.genre is None
+    assert decision.metadata_to_write.track_number == "1"

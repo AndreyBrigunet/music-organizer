@@ -48,6 +48,25 @@ class AudioMetadata:
             source=source or self.source,
         )
 
+    def merged_for_online_match(
+        self,
+        fallback: "AudioMetadata",
+        source: Optional[str] = None,
+    ) -> "AudioMetadata":
+        artist = self.artist or fallback.artist
+        album_artist = self.album_artist or self.artist or fallback.album_artist or artist
+        return AudioMetadata(
+            title=self.title or fallback.title,
+            artist=artist,
+            album=self.album,
+            album_artist=album_artist,
+            track_number=self.track_number or fallback.track_number,
+            disc_number=self.disc_number or fallback.disc_number,
+            date=self.date,
+            genre=self.genre,
+            source=source or self.source,
+        )
+
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
 

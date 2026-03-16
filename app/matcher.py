@@ -256,7 +256,7 @@ class TrackMatcher:
                     review_candidates=list(candidates[:5]),
                 )
             if best.confidence >= self.min_confidence:
-                normalized = best.metadata.merged_with(raw_metadata, source=best.source)
+                normalized = best.metadata.merged_for_online_match(raw_metadata, source=best.source)
                 return MatchDecision(
                     action="Matched",
                     detected_metadata=detected_metadata,

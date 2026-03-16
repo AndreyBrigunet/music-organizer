@@ -289,7 +289,10 @@ def maybe_resolve_review_decision(
         logger.info("Interactive review skipped for %s; keeping Review action.", audio_path)
         return decision
 
-    metadata_to_write = selected_candidate.metadata.merged_with(raw_metadata, source=selected_candidate.source)
+    metadata_to_write = selected_candidate.metadata.merged_for_online_match(
+        raw_metadata,
+        source=selected_candidate.source,
+    )
     notes = list(dict.fromkeys([*decision.notes, "user_selected_candidate"]))
     logger.info(
         "Interactive review selected candidate %s for %s",
