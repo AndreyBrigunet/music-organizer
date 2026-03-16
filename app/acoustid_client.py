@@ -54,8 +54,6 @@ class AcoustIdClient:
                 self.logger.warning("AcoustID fingerprint failed for %s: %s", path, exc)
             return []
 
-        self._log_lookup_request(path, duration, fingerprint)
-
         try:
             response = acoustid.lookup(
                 self.api_key,
@@ -138,25 +136,6 @@ class AcoustIdClient:
             else:
                 self.logger.warning("AcoustID lookup failed for %s: %s (code %s)", path, message, code)
 
-    def _log_lookup_request(self, path: Path, duration: float, fingerprint: object) -> None:
-        if not self.logger:
-            return
-        payload = {
-            "path": str(path),
-            "duration": int(duration),
-            "client": self._mask_api_key(self.api_key),
-            "fingerprint_preview": self._preview_fingerprint(fingerprint),
-            "fingerprint_length": self._safe_len(fingerprint),
-            "fingerprint_type": type(fingerprint).__name__,
-            "force_fpcalc": bool(self.fpcalc_path),
-            "fpcalc_path": self.fpcalc_path,
-        }
-        self.logger.info(
-            "AcoustID request for %s: %s",
-            path,
-            self._serialize_for_log(payload),
-        )
-
     def _log_lookup_response(self, path: Path, response: object) -> None:
         if not self.logger:
             return
@@ -167,27 +146,6 @@ class AcoustIdClient:
         if code == 4:
             return True
         return "invalid api key" in message.casefold()
-
-    @staticmethod
-    def _mask_api_key(value: Optional[str]) -> Optional[str]:
-        if not value:
-            return None
-        if len(value) <= 6:
-            return "*" * len(value)
-        return "{0}...{1}".format(value[:3], value[-3:])
-
-    @staticmethod
-    def _preview_fingerprint(value: object, limit: int = 24) -> str:
-        if isinstance(value, bytes):
-            return value[:limit].decode("ascii", errors="backslashreplace")
-        return str(value)[:limit]
-
-    @staticmethod
-    def _safe_len(value: object) -> Optional[int]:
-        try:
-            return len(value)  # type: ignore[arg-type]
-        except TypeError:
-            return None
 
     @classmethod
     def _serialize_for_log(cls, value: object) -> str:

@@ -61,7 +61,7 @@ def test_match_file_disables_client_after_invalid_api_key(monkeypatch) -> None:
     assert client.status_reason == "invalid ACOUSTID_API_KEY"
 
 
-def test_match_file_logs_acoustid_request_and_response(monkeypatch, caplog) -> None:
+def test_match_file_logs_acoustid_response_only(monkeypatch, caplog) -> None:
     logger = logging.getLogger("test_acoustid")
     client = AcoustIdClient(api_key="abcdef123456", logger=logger)
 
@@ -82,14 +82,11 @@ def test_match_file_logs_acoustid_request_and_response(monkeypatch, caplog) -> N
         matches = client.match_file(Path("track.flac"))
 
     assert matches == []
-    assert "AcoustID request for track.flac" in caplog.text
-    assert '"client": "abc...456"' in caplog.text
-    assert '"fingerprint_length": 17' in caplog.text
     assert "AcoustID response for track.flac" in caplog.text
     assert '"status": "ok"' in caplog.text
 
 
-def test_match_file_logs_bytes_fingerprint_without_crashing(monkeypatch, caplog) -> None:
+def test_match_file_accepts_bytes_fingerprint_without_crashing(monkeypatch, caplog) -> None:
     logger = logging.getLogger("test_acoustid_bytes")
     client = AcoustIdClient(api_key="abcdef123456", logger=logger)
 
@@ -110,5 +107,4 @@ def test_match_file_logs_bytes_fingerprint_without_crashing(monkeypatch, caplog)
         matches = client.match_file(Path("track.flac"))
 
     assert matches == []
-    assert '"fingerprint_type": "bytes"' in caplog.text
-    assert '"fingerprint_preview": "abc123fingerprint"' in caplog.text
+    assert "AcoustID response for track.flac" in caplog.text

@@ -127,25 +127,25 @@ python -m app.main --input "D:\MusicRaw" --output "D:\MusicSorted" --dry-run
 Comanda recomandată pentru folderele tale:
 
 ```powershell
-python -m app.main --input "C:\Users\andre\Music\Satoshi Radio" --output "D:\MusicSorted" --dry-run
+python -m app.main --input "D:\MusicRaw" --output "D:\MusicSorted" --dry-run
 ```
 
 Pentru a vedea în terminal decizia pentru fiecare fișier procesat:
 
 ```powershell
-python -m app.main --input "C:\Users\andre\Music\Satoshi Radio" --output "D:\MusicSorted" --dry-run --verbose
+python -m app.main --input "D:\MusicRaw" --output "D:\MusicSorted" --dry-run --verbose
 ```
 
 Pentru potrivirile ambigue, aplicația întreabă implicit direct în terminal ce variantă este corectă:
 
 ```powershell
-python -m app.main --input "C:\Users\andre\Music\Satoshi Radio" --output "D:\MusicSorted" --dry-run
+python -m app.main --input "D:\MusicRaw" --output "D:\MusicSorted" --dry-run
 ```
 
 Dacă vrei să dezactivezi prompturile interactive și să trimiți direct rezultatele ambigue în `Review`:
 
 ```powershell
-python -m app.main --input "C:\Users\andre\Music\Satoshi Radio" --output "D:\MusicSorted" --dry-run --no-interactive-review
+python -m app.main --input "D:\MusicRaw" --output "D:\MusicSorted" --dry-run --no-interactive-review
 ```
 
 Copiază fișierele organizate într-o bibliotecă nouă, păstrând originalele:
