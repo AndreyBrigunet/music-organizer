@@ -25,10 +25,10 @@ class _FakeResponse:
 
 
 def test_itunes_client_parses_numeric_track_fields(monkeypatch) -> None:
-    def fake_get(*args, **kwargs):
+    def fake_get(self, *args, **kwargs):
         return _FakeResponse()
 
-    monkeypatch.setattr("app.itunes_client.requests.get", fake_get)
+    monkeypatch.setattr("app.itunes_client.requests.Session.get", fake_get)
 
     client = ItunesClient()
     candidates = client.search_recordings(
@@ -39,3 +39,23 @@ def test_itunes_client_parses_numeric_track_fields(monkeypatch) -> None:
     assert len(candidates) == 1
     assert candidates[0].metadata.track_number == "3"
     assert candidates[0].metadata.disc_number == "1"
+
+
+def test_itunes_client_uses_cache_for_identical_queries(monkeypatch) -> None:
+    calls = {"count": 0}
+
+    def fake_get(self, *args, **kwargs):
+        calls["count"] += 1
+        return _FakeResponse()
+
+    monkeypatch.setattr("app.itunes_client.requests.Session.get", fake_get)
+
+    client = ItunesClient()
+    metadata = AudioMetadata(title="Song", artist="Artist", album="Album")
+    first = client.search_recordings(metadata, limit=1)
+    second = client.search_recordings(metadata, limit=1)
+
+    assert len(first) == 1
+    assert len(second) == 1
+    assert calls["count"] == 1
+    assert first is not second

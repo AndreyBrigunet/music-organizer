@@ -42,14 +42,14 @@ def test_discogs_client_requires_user_token() -> None:
 def test_discogs_client_parses_release_search_result(monkeypatch) -> None:
     captured = {}
 
-    def fake_get(url, params=None, headers=None, timeout=None):
+    def fake_get(self, url, params=None, headers=None, timeout=None):
         captured["url"] = url
         captured["params"] = params
         captured["headers"] = headers
         captured["timeout"] = timeout
         return _SuccessResponse()
 
-    monkeypatch.setattr("app.discogs_client.requests.get", fake_get)
+    monkeypatch.setattr("app.discogs_client.requests.Session.get", fake_get)
 
     client = DiscogsClient(user_token="token")
     candidates = client.search_recordings(
@@ -73,10 +73,10 @@ def test_discogs_client_parses_release_search_result(monkeypatch) -> None:
 
 
 def test_discogs_client_logs_structured_error(monkeypatch, caplog) -> None:
-    def fake_get(*args, **kwargs):
+    def fake_get(self, *args, **kwargs):
         return _ForbiddenResponse()
 
-    monkeypatch.setattr("app.discogs_client.requests.get", fake_get)
+    monkeypatch.setattr("app.discogs_client.requests.Session.get", fake_get)
 
     client = DiscogsClient(user_token="token", logger=logging.getLogger("test_discogs"))
     with caplog.at_level(logging.WARNING, logger="test_discogs"):
@@ -90,3 +90,23 @@ def test_discogs_client_logs_structured_error(monkeypatch, caplog) -> None:
     assert client.status_reason == "invalid DISCOGS_USER_TOKEN"
     assert '"provider": "discogs"' in caplog.text
     assert '"status_code": 403' in caplog.text
+
+
+def test_discogs_client_uses_cache_for_identical_queries(monkeypatch) -> None:
+    calls = {"count": 0}
+
+    def fake_get(self, *args, **kwargs):
+        calls["count"] += 1
+        return _SuccessResponse()
+
+    monkeypatch.setattr("app.discogs_client.requests.Session.get", fake_get)
+
+    client = DiscogsClient(user_token="token")
+    metadata = AudioMetadata(title="Imperfect", artist="Carla's Dreams")
+    first = client.search_recordings(metadata, limit=5)
+    second = client.search_recordings(metadata, limit=5)
+
+    assert len(first) == 1
+    assert len(second) == 1
+    assert calls["count"] == 1
+    assert first is not second

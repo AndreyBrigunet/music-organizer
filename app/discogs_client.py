@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 import json
 import logging
 from typing import Any, List, Optional, Tuple
@@ -8,7 +9,7 @@ import requests
 
 from app.config import APP_NAME, APP_VERSION
 from app.models import AudioMetadata, CandidateMatch
-from app.utils import normalize_text
+from app.utils import normalize_artist_for_compare, normalize_for_compare, normalize_text
 
 
 class DiscogsClient:
@@ -19,6 +20,8 @@ class DiscogsClient:
         self.logger = logger
         self.status_reason = None if self.user_token else "missing DISCOGS_USER_TOKEN"
         self.enabled = self.status_reason is None
+        self.session = requests.Session()
+        self._search_cache: dict[tuple[str, str, str, int], List[CandidateMatch]] = {}
 
     @property
     def status_label(self) -> str:
@@ -31,6 +34,10 @@ class DiscogsClient:
             return []
         if not metadata.title or not metadata.primary_artist():
             return []
+        cache_key = self._search_cache_key(metadata, limit)
+        cached = self._search_cache.get(cache_key)
+        if cached is not None:
+            return self._clone_candidates(cached)
 
         params: dict[str, str | int] = {
             "track": metadata.title,
@@ -49,7 +56,7 @@ class DiscogsClient:
         }
 
         try:
-            response = requests.get(self.api_url, params=params, headers=headers, timeout=15)
+            response = self.session.get(self.api_url, params=params, headers=headers, timeout=15)
         except Exception as exc:
             if self.logger:
                 self.logger.warning("Discogs search failed for %s / %s: %s", metadata.artist, metadata.title, exc)
@@ -94,6 +101,7 @@ class DiscogsClient:
                     reason="Discogs database search release match",
                 )
             )
+        self._search_cache[cache_key] = self._clone_candidates(candidates)
         return candidates
 
     def _handle_error_response(
@@ -151,3 +159,16 @@ class DiscogsClient:
             return None, cleaned
         artist, release = cleaned.split(" - ", 1)
         return normalize_text(artist), normalize_text(release)
+
+    @staticmethod
+    def _clone_candidates(candidates: List[CandidateMatch]) -> List[CandidateMatch]:
+        return deepcopy(candidates)
+
+    @staticmethod
+    def _search_cache_key(metadata: AudioMetadata, limit: int) -> tuple[str, str, str, int]:
+        return (
+            normalize_for_compare(metadata.title),
+            normalize_artist_for_compare(metadata.primary_artist()),
+            normalize_for_compare(metadata.album),
+            max(1, min(int(limit), 5)),
+        )

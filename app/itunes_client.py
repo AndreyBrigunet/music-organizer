@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+from copy import deepcopy
 import logging
 from typing import List, Optional
 
 import requests
 
 from app.models import AudioMetadata, CandidateMatch
-from app.utils import normalize_text
+from app.utils import normalize_artist_for_compare, normalize_for_compare, normalize_text
 
 
 class ItunesClient:
@@ -16,6 +17,8 @@ class ItunesClient:
         self.logger = logger
         self.enabled = True
         self.status_reason: Optional[str] = None
+        self.session = requests.Session()
+        self._search_cache: dict[tuple[str, str, str, int], List[CandidateMatch]] = {}
 
     @property
     def status_label(self) -> str:
@@ -24,6 +27,10 @@ class ItunesClient:
     def search_recordings(self, metadata: AudioMetadata, limit: int = 5) -> List[CandidateMatch]:
         if not metadata.title:
             return []
+        cache_key = self._search_cache_key(metadata, limit)
+        cached = self._search_cache.get(cache_key)
+        if cached is not None:
+            return self._clone_candidates(cached)
 
         term_parts = [metadata.primary_artist(), metadata.album, metadata.title]
         term = " ".join(part for part in term_parts if part)
@@ -34,7 +41,7 @@ class ItunesClient:
         }
 
         try:
-            response = requests.get(self.search_url, params=params, timeout=15)
+            response = self.session.get(self.search_url, params=params, timeout=15)
             response.raise_for_status()
             payload = response.json()
         except Exception as exc:
@@ -65,4 +72,18 @@ class ItunesClient:
                     reason="iTunes Search API match",
                 )
             )
+        self._search_cache[cache_key] = self._clone_candidates(candidates)
         return candidates
+
+    @staticmethod
+    def _clone_candidates(candidates: List[CandidateMatch]) -> List[CandidateMatch]:
+        return deepcopy(candidates)
+
+    @staticmethod
+    def _search_cache_key(metadata: AudioMetadata, limit: int) -> tuple[str, str, str, int]:
+        return (
+            normalize_for_compare(metadata.title),
+            normalize_artist_for_compare(metadata.primary_artist()),
+            normalize_for_compare(metadata.album),
+            limit,
+        )

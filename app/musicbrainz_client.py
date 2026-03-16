@@ -1,11 +1,12 @@
 ﻿from __future__ import annotations
 
+from copy import deepcopy
 import logging
 from typing import Any, Dict, List, Optional
 
 from app.config import APP_NAME, APP_VERSION
 from app.models import AudioMetadata, CandidateMatch
-from app.utils import normalize_text
+from app.utils import normalize_artist_for_compare, normalize_for_compare, normalize_text
 
 try:
     import musicbrainzngs
@@ -18,6 +19,8 @@ class MusicBrainzClient:
         self.logger = logger
         self.enabled = musicbrainzngs is not None
         self.status_reason = None if self.enabled else "musicbrainzngs not installed"
+        self._search_cache: dict[tuple[str, str, str, int], List[CandidateMatch]] = {}
+        self._lookup_cache: dict[str, Optional[AudioMetadata]] = {}
         if self.enabled:
             musicbrainzngs.set_useragent(
                 APP_NAME,
@@ -36,6 +39,10 @@ class MusicBrainzClient:
             return []
         if not metadata.title or not metadata.primary_artist():
             return []
+        cache_key = self._search_cache_key(metadata, limit)
+        cached = self._search_cache.get(cache_key)
+        if cached is not None:
+            return self._clone_candidates(cached)
 
         query = {
             "recording": metadata.title,
@@ -53,11 +60,15 @@ class MusicBrainzClient:
             return []
 
         recordings = response.get("recording-list", [])
-        return [self._recording_to_candidate(item) for item in recordings]
+        candidates = [self._recording_to_candidate(item) for item in recordings]
+        self._search_cache[cache_key] = self._clone_candidates(candidates)
+        return candidates
 
     def lookup_recording(self, recording_id: str) -> Optional[AudioMetadata]:
         if not self.enabled or not recording_id:
             return None
+        if recording_id in self._lookup_cache:
+            return deepcopy(self._lookup_cache[recording_id])
 
         try:
             response = musicbrainzngs.get_recording_by_id(
@@ -73,7 +84,7 @@ class MusicBrainzClient:
         artist_phrase = normalize_text(recording.get("artist-credit-phrase"))
         release_list = recording.get("release-list", [])
         release = release_list[0] if release_list else {}
-        return AudioMetadata(
+        metadata = AudioMetadata(
             title=normalize_text(recording.get("title")),
             artist=artist_phrase,
             album=normalize_text(release.get("title")),
@@ -81,6 +92,8 @@ class MusicBrainzClient:
             track_number=None,
             source="musicbrainz",
         )
+        self._lookup_cache[recording_id] = deepcopy(metadata)
+        return metadata
 
     def _recording_to_candidate(self, item: Dict[str, Any]) -> CandidateMatch:
         release_list = item.get("release-list", [])
@@ -119,3 +132,16 @@ class MusicBrainzClient:
             return float(raw_value) / 100.0
         except (TypeError, ValueError):
             return 0.0
+
+    @staticmethod
+    def _clone_candidates(candidates: List[CandidateMatch]) -> List[CandidateMatch]:
+        return deepcopy(candidates)
+
+    @staticmethod
+    def _search_cache_key(metadata: AudioMetadata, limit: int) -> tuple[str, str, str, int]:
+        return (
+            normalize_for_compare(metadata.title),
+            normalize_artist_for_compare(metadata.primary_artist()),
+            normalize_for_compare(metadata.album),
+            limit,
+        )
