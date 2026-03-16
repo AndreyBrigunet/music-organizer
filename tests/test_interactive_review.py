@@ -35,6 +35,7 @@ def test_interactive_review_selection_converts_review_to_matched(monkeypatch) ->
         reason="Candidate exists but confidence is below the acceptance threshold.",
         notes=["low_confidence_candidate"],
         review_candidates=[selected_candidate],
+        provider_trace=["musicbrainz: trying", "musicbrainz: best 0.88 (below threshold); trying next provider"],
     )
 
     monkeypatch.setattr("app.main.supports_interactive_review", lambda: True)
@@ -62,6 +63,7 @@ def test_interactive_review_selection_converts_review_to_matched(monkeypatch) ->
     assert resolved.metadata_to_write.album == "Noaptea pe la 3"
     assert resolved.metadata_to_write.genre is None
     assert "user_selected_candidate" in resolved.notes
+    assert resolved.provider_trace == decision.provider_trace
 
 
 def test_interactive_review_can_be_skipped(monkeypatch) -> None:

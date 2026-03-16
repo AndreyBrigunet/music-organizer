@@ -260,6 +260,9 @@ def render_result(result: ProcessingResult, input_dir: Path, output_dir: Path) -
         console.print("  [red]error:[/red] {0}".format(escape(result.error)))
     elif result.decision.action != "Matched" or "matched_by_tags" in result.decision.notes:
         console.print("  [dim]{0}[/dim]".format(escape(result.decision.reason)))
+    if result.decision.provider_trace:
+        for trace_line in result.decision.provider_trace:
+            console.print("  [dim]provider: {0}[/dim]".format(escape(trace_line)))
 
 
 def maybe_resolve_review_decision(
@@ -308,6 +311,7 @@ def maybe_resolve_review_decision(
         reason="Selected interactively by user.",
         notes=notes,
         review_candidates=candidates,
+        provider_trace=list(decision.provider_trace),
     )
 
 

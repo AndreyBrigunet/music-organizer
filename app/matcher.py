@@ -239,7 +239,7 @@ class TrackMatcher:
     def match(self, path: Path, raw_metadata: AudioMetadata) -> MatchDecision:
         detected_candidates = self._build_detected_metadata_candidates(path, raw_metadata)
         primary_detected_metadata = detected_candidates[0] if detected_candidates else AudioMetadata(source="filename")
-        candidates = self._collect_candidates(path, detected_candidates, raw_metadata)
+        candidates, provider_trace = self._collect_candidates(path, detected_candidates, raw_metadata)
         best, runner_up = self._pick_candidates(candidates)
 
         if best:
@@ -254,6 +254,7 @@ class TrackMatcher:
                     reason="Multiple similar candidates were found; manual review required.",
                     notes=["ambiguous_online_match"],
                     review_candidates=list(candidates[:5]),
+                    provider_trace=provider_trace,
                 )
             if best.confidence >= self.min_confidence:
                 normalized = best.metadata.merged_for_online_match(raw_metadata, source=best.source)
@@ -264,6 +265,7 @@ class TrackMatcher:
                     confidence=best.confidence,
                     chosen_match=best,
                     reason="High-confidence online match.",
+                    provider_trace=provider_trace,
                 )
             if best.confidence >= max(0.55, self.min_confidence - 0.20):
                 return MatchDecision(
@@ -275,6 +277,7 @@ class TrackMatcher:
                     reason="Candidate exists but confidence is below the acceptance threshold.",
                     notes=["low_confidence_candidate"],
                     review_candidates=list(candidates[:5]),
+                    provider_trace=provider_trace,
                 )
 
         if raw_metadata.has_any_identity():
@@ -287,6 +290,7 @@ class TrackMatcher:
                 chosen_match=None,
                 reason="No trusted online match found; organized using existing tags.",
                 notes=["matched_by_tags"],
+                provider_trace=provider_trace,
             )
 
         return MatchDecision(
@@ -296,6 +300,7 @@ class TrackMatcher:
             confidence=0.0,
             chosen_match=None,
             reason="Not enough trustworthy metadata to classify automatically.",
+            provider_trace=provider_trace,
         )
 
     def _build_detected_metadata_candidates(self, path: Path, raw_metadata: AudioMetadata) -> List[AudioMetadata]:
@@ -327,32 +332,78 @@ class TrackMatcher:
         path: Path,
         detected_metadata_candidates: Sequence[AudioMetadata],
         raw_metadata: AudioMetadata,
-    ) -> List[CandidateMatch]:
+    ) -> Tuple[List[CandidateMatch], List[str]]:
         candidate_map: dict[tuple[str, str], CandidateMatch] = {}
+        provider_trace: List[str] = []
 
-        for detected_metadata in detected_metadata_candidates:
-            if not (detected_metadata.title and detected_metadata.primary_artist()):
+        for client in self.search_clients:
+            provider_name = normalize_for_compare(getattr(client, "source", None))
+            if not provider_name:
+                provider_name = getattr(client, "__class__", type(client)).__name__.replace("Client", "").casefold() or "provider"
+            if hasattr(client, "enabled") and not getattr(client, "enabled"):
+                status_reason = getattr(client, "status_reason", None) or "disabled"
+                provider_trace.append("{0}: skipped ({1})".format(provider_name, status_reason))
                 continue
-            for client in self.search_clients:
+
+            provider_trace.append("{0}: trying".format(provider_name))
+            provider_candidate_map: dict[tuple[str, str], CandidateMatch] = {}
+            for detected_metadata in detected_metadata_candidates:
+                if not (detected_metadata.title and detected_metadata.primary_artist()):
+                    continue
                 for candidate in client.search_recordings(
                     detected_metadata,
                     limit=self.search_limit,
                 ):
                     candidate.query_metadata = detected_metadata
                     candidate.confidence = score_candidate_confidence(candidate, detected_metadata, raw_metadata)
-                    self._store_candidate(candidate_map, candidate)
+                    self._store_candidate(provider_candidate_map, candidate)
+
+            provider_candidates = list(provider_candidate_map.values())
+            self._sort_candidates(provider_candidates)
+            if not provider_candidates:
+                provider_trace.append("{0}: no candidates".format(provider_name))
+                continue
+            best, runner_up = self._pick_candidates(provider_candidates)
+            if best and best.confidence >= self.min_confidence and not is_ambiguous(best, runner_up):
+                provider_trace.append(
+                    "{0}: accepted {1:.2f}; later providers skipped".format(provider_name, best.confidence)
+                )
+                return provider_candidates, provider_trace
+
+            if best:
+                status = "ambiguous" if is_ambiguous(best, runner_up) else "below threshold"
+                provider_trace.append(
+                    "{0}: best {1:.2f} ({2}); trying next provider".format(provider_name, best.confidence, status)
+                )
+
+            for candidate in provider_candidates:
+                self._store_candidate(candidate_map, candidate)
 
         candidates = list(candidate_map.values())
         self._apply_cross_source_corroboration(candidates)
 
         if not self._has_strong_candidate(candidates):
+            provider_trace.append("acoustid: fallback")
             for candidate in self.acoustid_client.match_file(path):
                 detected_metadata = detected_metadata_candidates[0] if detected_metadata_candidates else AudioMetadata(source="tags")
                 candidate.query_metadata = detected_metadata
                 candidate.confidence = score_candidate_confidence(candidate, detected_metadata, raw_metadata)
                 self._store_candidate(candidate_map, candidate)
             candidates = list(candidate_map.values())
+            best_acoustid, runner_up_acoustid = self._pick_candidates(candidates)
+            if best_acoustid and best_acoustid.source == "acoustid":
+                if best_acoustid.confidence >= self.min_confidence and not is_ambiguous(best_acoustid, runner_up_acoustid):
+                    provider_trace.append("acoustid: accepted {0:.2f}".format(best_acoustid.confidence))
+                else:
+                    provider_trace.append("acoustid: best {0:.2f}".format(best_acoustid.confidence))
+            else:
+                provider_trace.append("acoustid: no usable match")
 
+        self._sort_candidates(candidates)
+        return candidates, provider_trace
+
+    @staticmethod
+    def _sort_candidates(candidates: List[CandidateMatch]) -> None:
         candidates.sort(
             key=lambda item: (
                 _is_exact_match(item.query_metadata.title if item.query_metadata else None, item.metadata.title),
@@ -364,7 +415,6 @@ class TrackMatcher:
             ),
             reverse=True,
         )
-        return candidates
 
     @staticmethod
     def _pick_candidates(candidates: Sequence[CandidateMatch]) -> Tuple[Optional[CandidateMatch], Optional[CandidateMatch]]:
@@ -374,9 +424,8 @@ class TrackMatcher:
         runner_up = candidates[1] if len(candidates) > 1 else None
         return best, runner_up
 
-    @staticmethod
-    def _has_strong_candidate(candidates: Sequence[CandidateMatch]) -> bool:
-        return any(candidate.confidence >= 0.90 for candidate in candidates)
+    def _has_strong_candidate(self, candidates: Sequence[CandidateMatch]) -> bool:
+        return any(candidate.confidence >= self.min_confidence for candidate in candidates)
 
     @staticmethod
     def _apply_cross_source_corroboration(candidates: Sequence[CandidateMatch]) -> None:

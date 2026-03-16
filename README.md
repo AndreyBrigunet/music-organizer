@@ -93,6 +93,7 @@ DISCOGS_USER_TOKEN=tokenul_tau_discogs
   - Controlează ordinea providerilor de catalog.
   - Valori suportate: `musicbrainz`, `itunes`, `lastfm`, `discogs`
   - Exemplu: `SEARCH_PROVIDER_ORDER=musicbrainz,itunes,lastfm,discogs`
+  - Pentru fiecare piesă, căutarea pornește din nou cu primul provider din listă și se oprește imediat ce apare un match online suficient de puternic.
   - `AcoustID` nu este controlat de această variabilă; rămâne fallback separat, deoarece este mai lent și lucrează pe fingerprint audio.
 - `MATCHED_PATH_TEMPLATE`
   - Opțională.
@@ -135,6 +136,8 @@ Pentru a vedea în terminal decizia pentru fiecare fișier procesat:
 ```powershell
 python -m app.main --input "D:\MusicRaw" --output "D:\MusicSorted" --dry-run --verbose
 ```
+
+În `--verbose`, aplicația afișează și traseul providerilor pentru fiecare piesă: când încearcă un provider, când trece la următorul și când oprește căutarea pe un match suficient de puternic.
 
 Pentru potrivirile ambigue, aplicația întreabă implicit direct în terminal ce variantă este corectă. Poți alege o variantă din listă sau `0` pentru `niciunul`, caz în care piesa rămâne în `Review`:
 

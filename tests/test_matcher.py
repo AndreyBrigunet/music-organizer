@@ -135,6 +135,39 @@ class _NoAcoustIdClient:
         return []
 
 
+class _StrongSequentialProvider:
+    def __init__(self, source: str = "musicbrainz") -> None:
+        self.source = source
+        self.calls = 0
+
+    def search_recordings(self, metadata: AudioMetadata, limit: int = 5):
+        self.calls += 1
+        return [
+            CandidateMatch(
+                metadata=AudioMetadata(
+                    title=metadata.title,
+                    artist=metadata.artist,
+                    album=metadata.album,
+                    source=self.source,
+                ),
+                confidence=0.0,
+                source=self.source,
+                raw_score=0.99,
+                recording_id="{0}-{1}".format(self.source, self.calls),
+            )
+        ]
+
+
+class _TrackingProvider:
+    def __init__(self, source: str = "itunes") -> None:
+        self.source = source
+        self.calls = 0
+
+    def search_recordings(self, metadata: AudioMetadata, limit: int = 5):
+        self.calls += 1
+        return []
+
+
 def test_review_decision_keeps_candidate_list_for_interactive_selection() -> None:
     matcher = TrackMatcher(
         min_confidence=0.95,
@@ -202,3 +235,46 @@ def test_online_match_does_not_preserve_stale_album_or_genre_tags() -> None:
     assert decision.metadata_to_write.album is None
     assert decision.metadata_to_write.genre is None
     assert decision.metadata_to_write.track_number == "1"
+
+
+def test_matcher_stops_after_first_strong_provider_and_restarts_for_next_file() -> None:
+    first_provider = _StrongSequentialProvider(source="musicbrainz")
+    second_provider = _TrackingProvider(source="itunes")
+    matcher = TrackMatcher(
+        min_confidence=0.85,
+        search_clients=[first_provider, second_provider],
+        acoustid_client=_NoAcoustIdClient(),
+        search_limit=5,
+    )
+
+    first_decision = matcher.match(
+        Path("first.flac"),
+        AudioMetadata(
+            title="Song",
+            artist="Artist",
+            album="Album",
+            source="tags",
+        ),
+    )
+    second_decision = matcher.match(
+        Path("second.flac"),
+        AudioMetadata(
+            title="Another Song",
+            artist="Artist",
+            album="Album",
+            source="tags",
+        ),
+    )
+
+    assert first_decision.action == "Matched"
+    assert second_decision.action == "Matched"
+    assert first_provider.calls == 2
+    assert second_provider.calls == 0
+    assert first_decision.provider_trace == [
+        "musicbrainz: trying",
+        "musicbrainz: accepted 0.99; later providers skipped",
+    ]
+    assert second_decision.provider_trace == [
+        "musicbrainz: trying",
+        "musicbrainz: accepted 0.99; later providers skipped",
+    ]

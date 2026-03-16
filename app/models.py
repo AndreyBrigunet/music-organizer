@@ -125,6 +125,7 @@ class MatchDecision:
     reason: str
     notes: List[str] = field(default_factory=list)
     review_candidates: List[CandidateMatch] = field(default_factory=list)
+    provider_trace: List[str] = field(default_factory=list)
 
     def to_report_dict(self, original_path: str, destination_path: Optional[str]) -> Dict[str, Any]:
         match_provider = self.report_provider()
