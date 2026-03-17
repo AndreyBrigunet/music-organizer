@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 
 import shutil
+import stat
 from pathlib import Path
 from typing import Set
 
@@ -52,6 +53,7 @@ class LibraryMover:
             shutil.copy2(source_path, final_destination)
         elif self.config.mode == OperationMode.MOVE:
             shutil.move(str(source_path), str(final_destination))
+        self._ensure_destination_writable(final_destination)
         return final_destination
 
     def is_dry_run(self) -> bool:
@@ -84,3 +86,11 @@ class LibraryMover:
         path_parts = [part for part in Path(rendered).parts if part not in {"", "."}]
         sanitized_parts = [sanitize_path_component(part) for part in path_parts]
         return Path("Matched", *sanitized_parts)
+
+    def _ensure_destination_writable(self, path: Path) -> None:
+        try:
+            path.chmod(path.stat().st_mode | stat.S_IWRITE)
+        except FileNotFoundError:
+            return
+        except Exception:
+            return

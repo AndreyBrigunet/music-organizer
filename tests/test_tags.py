@@ -16,6 +16,18 @@ class _FakeEasyAudio:
         self.saved = True
 
 
+class _FakeRetryEasyAudio(_FakeEasyAudio):
+    def __init__(self) -> None:
+        super().__init__()
+        self.save_attempts = 0
+
+    def save(self) -> None:
+        self.save_attempts += 1
+        if self.save_attempts == 1:
+            raise PermissionError("Permission denied")
+        self.saved = True
+
+
 class _FakeID3Tags:
     def __init__(self) -> None:
         self.deleted: list[str] = []
@@ -108,3 +120,27 @@ def test_write_metadata_writes_musicbrainz_ids_for_mp3(monkeypatch) -> None:
         ("MusicBrainz Artist Id", ["artist-id"]),
         ("MusicBrainz Album Artist Id", ["album-artist-id"]),
     ]
+
+
+def test_write_metadata_retries_once_after_permission_denied(monkeypatch, tmp_path: Path) -> None:
+    audio_path = tmp_path / "song.mp3"
+    audio_path.write_text("placeholder", encoding="utf-8")
+    retry_audio = _FakeRetryEasyAudio()
+
+    def fake_mutagen_file(path: Path, easy: bool = False):
+        assert easy is True
+        return retry_audio
+
+    monkeypatch.setattr("app.tags.MutagenFile", fake_mutagen_file)
+
+    write_metadata(
+        audio_path,
+        AudioMetadata(
+            title="Song",
+            artist="Artist",
+            source="musicbrainz",
+        ),
+    )
+
+    assert retry_audio.save_attempts == 2
+    assert retry_audio.saved is True

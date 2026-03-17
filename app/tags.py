@@ -1,8 +1,10 @@
 ﻿from __future__ import annotations
 
 import logging
+import stat
 from pathlib import Path
 import re
+import time
 from typing import Any, Dict, Iterable, Optional
 
 from app.models import AudioMetadata
@@ -66,6 +68,7 @@ def write_metadata(
     if MutagenFile is None:
         raise RuntimeError("mutagen is not installed. Install dependencies from requirements.txt.")
 
+    _ensure_file_is_writable(path, logger=logger)
     audio = MutagenFile(path, easy=True)
     if audio is None:
         raise RuntimeError("Mutagen could not open file for writing: {0}".format(path))
@@ -97,7 +100,7 @@ def write_metadata(
         elif key in audio.tags:
             del audio.tags[key]
 
-    audio.save()
+    _save_audio_with_retry(audio, path, logger=logger)
     _write_musicbrainz_tags(path, metadata, logger=logger)
 
 
@@ -128,6 +131,7 @@ def _write_musicbrainz_tags(
     if MutagenFile is None:
         raise RuntimeError("mutagen is not installed. Install dependencies from requirements.txt.")
 
+    _ensure_file_is_writable(path, logger=logger)
     audio = MutagenFile(path)
     if audio is None:
         raise RuntimeError("Mutagen could not open file for MusicBrainz tag writing: {0}".format(path))
@@ -142,10 +146,44 @@ def _write_musicbrainz_tags(
             _write_mp4_musicbrainz_tags(audio, musicbrainz_tags)
         else:
             return
-        audio.save()
+        _save_audio_with_retry(audio, path, logger=logger)
     except Exception as exc:
         if logger:
             logger.warning("MusicBrainz tag write failed for %s: %s", path, exc)
+
+
+def _ensure_file_is_writable(path: Path, logger: Optional[logging.Logger] = None) -> None:
+    try:
+        path.chmod(path.stat().st_mode | stat.S_IWRITE)
+    except FileNotFoundError:
+        return
+    except Exception as exc:
+        if logger:
+            logger.warning("Could not ensure writable file mode for %s: %s", path, exc)
+
+
+def _save_audio_with_retry(audio: Any, path: Path, logger: Optional[logging.Logger] = None) -> None:
+    last_error: Optional[Exception] = None
+    for attempt in range(2):
+        try:
+            audio.save()
+            return
+        except Exception as exc:
+            last_error = exc
+            if not _is_permission_error(exc) or attempt == 1:
+                raise
+            if logger:
+                logger.warning("Permission denied while writing tags for %s; retrying after clearing readonly flag.", path)
+            _ensure_file_is_writable(path, logger=logger)
+            time.sleep(0.1)
+    if last_error is not None:
+        raise last_error
+
+
+def _is_permission_error(exc: Exception) -> bool:
+    if isinstance(exc, PermissionError):
+        return True
+    return "permission denied" in str(exc).casefold()
 
 
 def _write_id3_musicbrainz_tags(audio: Any, musicbrainz_tags: Dict[str, Optional[str]]) -> None:

@@ -1,5 +1,6 @@
 ﻿from pathlib import Path
 
+import stat
 from app.config import AppConfig, OperationMode
 from app.models import AudioMetadata, MatchDecision
 from app.mover import LibraryMover
@@ -78,6 +79,7 @@ def test_transfer_avoids_filename_collision(tmp_path: Path) -> None:
     mover = LibraryMover(config)
     source = config.input_dir / "track.mp3"
     source.write_text("source", encoding="utf-8")
+    source.chmod(source.stat().st_mode & ~stat.S_IWRITE)
 
     destination = config.output_dir / "Matched" / "Artist" / "Album" / "01 - Song.mp3"
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -86,6 +88,7 @@ def test_transfer_avoids_filename_collision(tmp_path: Path) -> None:
     final_destination = mover.transfer(source, destination)
     assert final_destination.name == "01 - Song (2).mp3"
     assert final_destination.read_text(encoding="utf-8") == "source"
+    assert final_destination.stat().st_mode & stat.S_IWRITE
     assert source.exists()
 
 
