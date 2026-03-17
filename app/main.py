@@ -24,7 +24,13 @@ from app.musicbrainz_client import MusicBrainzClient
 from app.reporter import ReportWriter
 from app.scanner import LibraryScanner
 from app.tags import read_metadata, write_metadata
-from app.utils import safe_relative_path, setup_logging
+from app.utils import (
+    normalize_artist_for_compare,
+    normalize_for_compare,
+    normalize_text,
+    safe_relative_path,
+    setup_logging,
+)
 
 
 app = typer.Typer(add_completion=False, help="Organize a local music library safely.")
@@ -282,13 +288,14 @@ def maybe_resolve_review_decision(
         return decision
 
     candidates = decision.review_candidates or ([decision.chosen_match] if decision.chosen_match else [])
-    if not candidates:
+    review_candidates = build_review_prompt_candidates(audio_path, raw_metadata, decision.detected_metadata, candidates)
+    if not review_candidates:
         return decision
 
     if pause_progress:
         pause_progress()
     try:
-        selected_candidate = prompt_for_review_candidate(audio_path, decision.detected_metadata, candidates)
+        selected_candidate = prompt_for_review_candidate(audio_path, decision.detected_metadata, review_candidates)
     finally:
         if resume_progress:
             resume_progress()
@@ -296,11 +303,17 @@ def maybe_resolve_review_decision(
         logger.info("Interactive review skipped for %s; keeping Review action.", audio_path)
         return decision
 
-    metadata_to_write = selected_candidate.metadata.merged_for_online_match(
-        raw_metadata,
-        source=selected_candidate.source,
-    )
-    notes = list(dict.fromkeys([*decision.notes, "user_selected_candidate"]))
+    if selected_candidate.source == "detected":
+        metadata_to_write = selected_candidate.metadata
+        reason = "Selected detected local metadata interactively."
+        notes = list(dict.fromkeys([*decision.notes, "user_selected_detected_metadata"]))
+    else:
+        metadata_to_write = selected_candidate.metadata.merged_for_online_match(
+            raw_metadata,
+            source=selected_candidate.source,
+        )
+        reason = "Selected interactively by user."
+        notes = list(dict.fromkeys([*decision.notes, "user_selected_candidate"]))
     logger.info(
         "Interactive review selected candidate %s for %s",
         selected_candidate.recording_id or selected_candidate.metadata.title,
@@ -312,10 +325,68 @@ def maybe_resolve_review_decision(
         metadata_to_write=metadata_to_write,
         confidence=selected_candidate.confidence,
         chosen_match=selected_candidate,
-        reason="Selected interactively by user.",
+        reason=reason,
         notes=notes,
-        review_candidates=candidates,
+        review_candidates=review_candidates,
         provider_trace=list(decision.provider_trace),
+    )
+
+
+def build_review_prompt_candidates(
+    audio_path: Path,
+    raw_metadata: AudioMetadata,
+    detected_metadata: AudioMetadata,
+    candidates: List[CandidateMatch],
+) -> List[CandidateMatch]:
+    review_candidates = list(candidates)
+    detected_candidate = _build_detected_review_candidate(audio_path, raw_metadata, detected_metadata)
+    if detected_candidate and not _candidate_exists(review_candidates, detected_candidate):
+        review_candidates.insert(0, detected_candidate)
+    return review_candidates
+
+
+def _build_detected_review_candidate(
+    audio_path: Path,
+    raw_metadata: AudioMetadata,
+    detected_metadata: AudioMetadata,
+) -> Optional[CandidateMatch]:
+    title = detected_metadata.title or raw_metadata.title or normalize_text(audio_path.stem)
+    artist = detected_metadata.artist or detected_metadata.album_artist or raw_metadata.artist or raw_metadata.album_artist
+    if not (title and artist):
+        return None
+
+    album = detected_metadata.album or raw_metadata.album or "Singles"
+    album_artist = detected_metadata.album_artist or detected_metadata.artist or raw_metadata.album_artist or raw_metadata.artist or artist
+    metadata = AudioMetadata(
+        title=title,
+        artist=artist,
+        album=album,
+        album_artist=album_artist,
+        track_number=detected_metadata.track_number or raw_metadata.track_number,
+        disc_number=detected_metadata.disc_number or raw_metadata.disc_number,
+        date=detected_metadata.date or raw_metadata.date,
+        genre=detected_metadata.genre or raw_metadata.genre,
+        source="detected",
+    )
+    return CandidateMatch(
+        metadata=metadata,
+        confidence=0.50,
+        source="detected",
+        reason="Local filename/tag detection.",
+        query_metadata=detected_metadata,
+    )
+
+
+def _candidate_exists(candidates: List[CandidateMatch], candidate: CandidateMatch) -> bool:
+    candidate_key = _review_candidate_identity(candidate)
+    return any(_review_candidate_identity(existing) == candidate_key for existing in candidates)
+
+
+def _review_candidate_identity(candidate: CandidateMatch) -> tuple[str, str, str]:
+    return (
+        normalize_for_compare(candidate.metadata.title),
+        normalize_artist_for_compare(candidate.metadata.primary_artist()),
+        normalize_for_compare(candidate.metadata.album),
     )
 
 
